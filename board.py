@@ -19,7 +19,7 @@ class TicTacToeBoard:
 
 
     # return True if winning false if not
-    def check_win_conditions(self) -> bool:
+    def check_win_conditions(self):
         win_conditions = [
             # rows
             {(0, 0), (0, 1), (0, 2)},
@@ -37,11 +37,11 @@ class TicTacToeBoard:
         for condition in win_conditions:
             if condition.issubset(self.player_1['traj']):
                 print("player 1 wins~congrats!")
-                return True
+                return True, 1
             elif condition.issubset(self.player_2['traj']):
                 print("player 2 wins~congrats!")
-                return True
-        return False
+                return True, 2
+        return False, 0 #0 means game draw
 
 
 
@@ -115,7 +115,7 @@ def player_1(state) -> int:
 
 def player_2(state) -> int:
 
-    print("your turn, select your action")
+    print("your turn, select your action!")
     print("board:")
     print(state['board'])
     print("possible actions:")
@@ -146,19 +146,24 @@ turns = 0
 random_coin = random.randint(0, 1)
 print("coin FLIP:", "HEAD" if random_coin == 0 else "TAIL")
 board.current_player_idx = 2 if random_coin == player_coin else 1
-while  not board.check_win_conditions() and len(board.get_action_lists()) != 0:
+win_conditions, _ = board.check_win_conditions()
+while  not win_conditions and len(board.get_action_lists()) != 0:
 
     state = {
         "board": board.board_state,
-        "actions": board.get_action_lists()
+        "actions": board.get_action_lists(),
+        "player_index": board.current_player_idx
     }
+    print("current player turn:", "player" if state['player_index'] == 2 else "MCTS-Agent")
     player_action = players[board.current_player_idx](state)
     act(board.current_player_idx, player_action, board)
 
 
     turns += 1
+    win_conditions, player_wins = board.check_win_conditions()
     print("="*20)
-    
+
+print("player wins:", player_wins)
 print(f"game finished with {turns} turn!")
 print('final board state:')
 print(board.board_state)
