@@ -1,9 +1,11 @@
 import numpy as np
 import random
 
+from api import check_win_conditions
 
 # tic tac toe is a:
 # TicTacToe Environment Class
+
 class TicTacToeBoard:
 
     board_state: np.ndarray
@@ -17,36 +19,6 @@ class TicTacToeBoard:
         self.current_player_idx = 0
         self.init_board(size)
 
-
-    # return True if winning false if not
-    def check_win_conditions(self):
-        win_conditions = [
-            # rows
-            {(0, 0), (0, 1), (0, 2)},
-            {(1, 0), (1, 1), (1, 2)},
-            {(2, 0), (2, 1), (2, 2)},
-            # columns
-            {(0, 0), (1, 0), (2, 0)},
-            {(0, 1), (1, 1), (2, 1)},
-            {(0, 2), (1, 2), (2, 2)},
-            # diagonals
-            {(0, 0), (1, 1), (2, 2)},
-            {(0, 2), (1, 1), (2, 0)},
-        ]
-
-        for condition in win_conditions:
-            if condition.issubset(self.player_1['traj']):
-                print("player 1 wins~congrats!")
-                return True, 1
-            elif condition.issubset(self.player_2['traj']):
-                print("player 2 wins~congrats!")
-                return True, 2
-        return False, 0 #0 means game draw
-
-
-
-
-        return False
     def init_board(self, size):
         self.player_1 = {'traj': set()}
         self.player_2 = {'traj': set()}
@@ -146,7 +118,8 @@ turns = 0
 random_coin = random.randint(0, 1)
 print("coin FLIP:", "HEAD" if random_coin == 0 else "TAIL")
 board.current_player_idx = 2 if random_coin == player_coin else 1
-win_conditions, _ = board.check_win_conditions()
+win_conditions, _ = check_win_conditions(board.player_1['traj'], board.player_2['traj'])
+player_wins = 0
 while  not win_conditions and len(board.get_action_lists()) != 0:
 
     state = {
@@ -160,7 +133,7 @@ while  not win_conditions and len(board.get_action_lists()) != 0:
 
 
     turns += 1
-    win_conditions, player_wins = board.check_win_conditions()
+    win_conditions, player_wins = check_win_conditions(board.player_1['traj'], board.player_2['traj'])
     print("="*20)
 
 print("player wins:", player_wins)
