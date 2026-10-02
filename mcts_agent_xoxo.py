@@ -4,7 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 import random
 
-from api import check_win_conditions, ucb
+from api import check_win_conditions_xoxo, ucb
 
 
 class Policy:
@@ -29,7 +29,7 @@ class MCTSNode:
         self.wins = 0.0
 
     def is_terminal(self):
-        return check_win_conditions(self.state.board_state)[1] != 0 or len(self.state.get_action_lists()) == 0
+        return check_win_conditions_xoxo(self.state.board_state)[1] != 0 or len(self.state.get_action_lists()) == 0
 
     def is_fully_expanded(self):
         return len(self.untried_actions) == 0
@@ -58,7 +58,7 @@ class MCTSNode:
         player = state.current_player_idx
 
         while True:
-            _, winner, _ = check_win_conditions(state.board_state)
+            _, winner, _ = check_win_conditions_xoxo(state.board_state)
 
             if winner != 0:
                 return winner

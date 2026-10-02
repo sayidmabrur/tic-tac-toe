@@ -1,12 +1,13 @@
 import numpy as np
+from mcts_agent_xoxo import mcts_search
 import random
 
-from api import check_win_conditions
+from api import check_win_conditions_xoxo, get_xoxo_scores
 
 # tic tac toe is a:
 # TicTacToe Environment Class
 
-class TicTacToeBoard:
+class XoXoBoard:
 
     board_state: np.ndarray
     player_1: dict
@@ -74,33 +75,39 @@ class TicTacToeBoard:
     def reset(self):
         pass
 
-
-
-
 # action is the index of the legal action
 def player_1(state) -> int:
-    action = 0
+    action_idx = mcts_search(state)
 
-    print("Player 1(AI MCTS) action:", state['actions'][action])
-    return action
+    
+    print(action_idx)
+    return action_idx
     pass
 
 def player_2(state) -> int:
 
     print("your turn, select your action!")
     print("board:")
-    print(state['board'])
+    print(state.board_state)
     print("possible actions:")
-    print(state['actions'])
-    action = int(input(f"please select action (0-{len(state['actions'])-1}):"))
-    pass
-    return action
+    print(state.get_action_lists())
+    max_action = len(state.get_action_lists()) - 1
+    while True:
+        try:
+            action = int(input(f"please select action (0-{max_action}):"))
+        except ValueError:
+            print("invalid input, please enter a number.")
+            continue
+        if 0 <= action <= max_action:
+            return action
+        print(f"action out of range, choose between 0 and {max_action}.")
 
 
-board = TicTacToeBoard((3, 3))
+board_size = int(input("input the board size:"))
+board = XoXoBoard((board_size, board_size))
 
 
-def act(p_idx, act_idx, board: TicTacToeBoard):
+def act(p_idx, act_idx, board: XoXoBoard):
     legal_actions = board.get_action_lists()
     board.apply_action(p_idx, legal_actions[act_idx])
     pass
@@ -118,25 +125,25 @@ turns = 0
 random_coin = random.randint(0, 1)
 print("coin FLIP:", "HEAD" if random_coin == 0 else "TAIL")
 board.current_player_idx = 2 if random_coin == player_coin else 1
-win_conditions, _ = check_win_conditions(board.player_1['traj'], board.player_2['traj'])
+win_conditions, _, _ = check_win_conditions_xoxo(board.board_state)
 player_wins = 0
 while  not win_conditions and len(board.get_action_lists()) != 0:
 
-    state = {
-        "board": board.board_state,
-        "actions": board.get_action_lists(),
-        "player_index": board.current_player_idx
-    }
-    print("current player turn:", "player" if state['player_index'] == 2 else "MCTS-Agent")
+    state = board
+    print("current player turn:", "player" if state.current_player_idx else "MCTS-Agent")
+    p1_score, p2_score = get_xoxo_scores(board.board_state)
+    print(f"score -> MCTS-Agent (X): {p1_score} | player (O): {p2_score}")
     player_action = players[board.current_player_idx](state)
     act(board.current_player_idx, player_action, board)
 
 
     turns += 1
-    win_conditions, player_wins = check_win_conditions(board.player_1['traj'], board.player_2['traj'])
+    win_conditions, player_wins, _ = check_win_conditions_xoxo(board.board_state)
     print("="*20)
 
 print("player wins:", player_wins)
 print(f"game finished with {turns} turn!")
 print('final board state:')
 print(board.board_state)
+final_p1_score, final_p2_score = get_xoxo_scores(board.board_state)
+print(f"final score -> MCTS-Agent (X): {final_p1_score} | player (O): {final_p2_score}")
