@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCTS Visualizer</title>
+<style>
+  :root { --bg:#f6f5f1; --panel:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#d9d7cf;
+          --x:#d6451f; --o:#1f6fd6; --accent:#1d1d1f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --panel:#202026; --ink:#f0f0f2; --muted:#9a9aa3; --line:#3a3a44;
+            --x:#ff7a59; --o:#6aa6ff; --accent:#f0f0f2; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--ink);
+         font:16px/1.4 system-ui, sans-serif; display:flex; justify-content:center; }
+  main { width:100%; max-width:520px; }
+  h1 { font-size:20px; margin:0 0 16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .controls { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .controls button.primary { cursor:pointer; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  select, input, button { font:inherit; color:var(--ink); background:var(--bg);
+         border:1px solid var(--line); border-radius:8px; padding:8px; }
+  button.primary { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  #status { margin:16px 0 8px; font-weight:600; min-height:1.4em; }
+  #scores { color:var(--muted); min-height:1.4em; margin-bottom:12px; }
+  #board { display:grid; gap:6px; margin:0 auto; width:100%; max-width:440px; position:relative; }
+  #strikes { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #strikes line { stroke-width:6; stroke-linecap:round; opacity:.8; }
+  #strikes line.x { stroke:var(--x); } #strikes line.o { stroke:var(--o); }
+  .cell { aspect-ratio:1; background:var(--panel); border:1px solid var(--line);
+          border-radius:8px; font-size:clamp(20px, 7vw, 44px); font-weight:700; padding:0;
+          cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .cell:disabled { cursor:default; }
+  .cell.x { color:var(--x); } .cell.o { color:var(--o); }
+  .cell.last { outline:3px solid var(--accent); outline-offset:-3px; }
+  .cell.open:not(:disabled):hover { background:var(--bg); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MCTS Visualizer</h1>
+  <div class="panel">
+    <div class="controls">
+      <label>Game
+        <select id="kind"><option value="tictactoe">Tic-tac-toe</option><option value="xoxo">XOXO</option></select>
+      </label>
+      <label>Board size
+        <input id="size" type="number" min="3" max="8" value="3">
+      </label>
+      <label>You play
+        <select id="human">
+          <option value="1">X (first)</option><option value="2">O (second)</option>
+          <option value="0">Nobody (agent vs agent)</option>
+        </select>
+      </label>
+      <label>MCTS iterations
+        <input id="iterations" type="number" min="10" max="20000" step="100" value="1000">
+      </label>
+      <button class="primary" id="new">New game</button>
+      <button class="primary" id="simulate">Simulate MCTS vs MCTS</button>
+    </div>
+    <div id="status"></div>
+    <div id="scores"></div>
+    <div id="board"></div>
+  </div>
+</main>
+<script src="transport.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const MARK = {1:"X", 2:"O"};
+let busy = false, run = 0, prev = null, last = null;
+
+// draw a line through every scoring 3-in-a-row (XOXO), centred on the cells
+function drawStrikes(s) {
+  if (!s.lines || !s.lines.length) return;
+  const board = $("board");
+  const cells = board.querySelectorAll(".cell");
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.id = "strikes";
+  const centre = ([r, c]) => {
+    const el = cells[r * s.size + c];
+    return [el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight / 2];
+  };
+  s.lines.forEach(l => {
+    const [x1, y1] = centre(l.from), [x2, y2] = centre(l.to);
+    const line = document.createElementNS(NS, "line");
+    line.setAttribute("class", MARK[l.player].toLowerCase());
+    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+    svg.appendChild(line);
+  });
+  board.appendChild(svg);
+}
+
+function render(s) {
+  // highlight the cell that changed since the last state
+  if (s !== prev) {
+    last = null;
+    if (prev && prev.size === s.size) {
+      s.board.forEach((row, r) => row.forEach((v, c) => { if (v !== prev.board[r][c]) last = [r, c]; }));
+    }
+    prev = s;
+  }
+
+  const humanTurn = !s.finished && s.current === s.human;
+  const board = $("board");
+  board.style.gridTemplateColumns = `repeat(${s.size}, 1fr)`;
+  board.innerHTML = "";
+  s.board.forEach((row, r) => row.forEach((v, c) => {
+    const b = document.createElement("button");
+    b.className = "cell" + (v ? " " + MARK[v].toLowerCase() : " open") +
+      (last && last[0] === r && last[1] === c ? " last" : "");
+    b.textContent = v ? MARK[v] : "";
+    b.disabled = !humanTurn || v !== 0 || busy;
+    b.onclick = () => humanMove(r, c);
+    board.appendChild(b);
+  }));
+  drawStrikes(s);
+
+  $("scores").textContent = s.scores ? `Score  X: ${s.scores[0]}   O: ${s.scores[1]}` : "";
+  if (s.finished) {
+    $("status").textContent = s.winner === 0 ? "Draw" :
+      (s.human === 0 ? `${MARK[s.winner]} wins` : (s.winner === s.human ? "You win!" : "MCTS wins"));
+  } else if (s.human === 0) {
+    $("status").textContent = `${MARK[s.current]} (MCTS) is thinking...`;
+  } else {
+    $("status").textContent = humanTurn ? `Your turn (${MARK[s.human]})` : "MCTS is thinking...";
+  }
+}
+
+async function advance(s, myRun) {
+  // let the agent move while it is the agent's turn
+  while (!s.finished && s.current !== s.human && myRun === run) {
+    busy = true; render(s);
+    await new Promise(r => setTimeout(r, s.human === 0 ? 400 : 50));
+    if (myRun !== run) return;
+    s = await call("/agent", {});
+  }
+  busy = false;
+  if (myRun === run) render(s);
+}
+
+async function humanMove(r, c) {
+  if (busy) return;
+  try {
+    busy = true;
+    const s = await call("/move", {row:r, col:c});
+    render(s);
+    await advance(s, run);
+  } catch (e) { busy = false; $("status").textContent = e.message; }
+}
+
+async function newGame(human = +$("human").value) {
+  run += 1; prev = null;
+  try {
+    const s = await call("/new", {
+      kind: $("kind").value, size: +$("size").value, human: human,
+      iterations: +$("iterations").value });
+    await advance(s, run);
+  } catch (e) { busy = false; $("status").textContent = e.message; }
+}
+
+$("size").max = LIMITS.size;
+$("iterations").max = LIMITS.iterations;
+$("status").textContent = "Loading...";
+window.addEventListener("resize", () => { if (prev) render(prev); });
+$("new").onclick = () => newGame();
+// agent vs agent with the current game / size / iterations settings
+$("simulate").onclick = () => newGame(0);
+newGame();
+</script>
+</body>
+</html>

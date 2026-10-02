@@ -1,8 +1,10 @@
-# Tic-tac-Toe Implementation of MCTS
+# Tic-tac-Toe & XOXO Implementation of MCTS
 
 a toy playground to play against agent implemented using Monte Carlo Tree Search (MCTS).
 
 Tic-tac-toe has a small, deterministic action space. Which a good playground to understand how MCTS works.
+
+to expand the game, we implemented MCTS TO XO game as well.
 
 
 ## Running the game

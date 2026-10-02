@@ -74,6 +74,7 @@ class MCTSNode:
     def backpropagate(self, winner):
         self.visits += 1
 
+        # credit the player who moved into this node (the one NOT to move here)
         mover = 2 if self.state.current_player_idx == 1 else 1
         if winner is None:
             self.wins += 0.5
